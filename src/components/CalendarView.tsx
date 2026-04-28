@@ -12,6 +12,9 @@ import {
   Square,
   Filter,
   ChevronUp,
+  MapPin,
+  Clock,
+  FileText,
 } from "lucide-react";
 
 export interface CalendarEventInput {
@@ -170,8 +173,12 @@ export default function CalendarView({
     try {
       const payload: Record<string, unknown> = {
         title: editForm.title,
-        start_time: editForm.start ? new Date(editForm.start).toISOString() : modalData.start,
-        end_time: editForm.end ? new Date(editForm.end).toISOString() : null,
+        start_time: editForm.start
+          ? new Date(editForm.start).toISOString()
+          : modalData.start,
+        end_time: editForm.end
+          ? new Date(editForm.end).toISOString()
+          : null,
         location: editForm.location || null,
         category: editForm.category,
         detail: editForm.detail || null,
@@ -193,8 +200,12 @@ export default function CalendarView({
       const updated: CalendarEventInput = {
         ...modalData,
         title: editForm.title,
-        start: editForm.start ? new Date(editForm.start).toISOString() : modalData.start,
-        end: editForm.end ? new Date(editForm.end).toISOString() : undefined,
+        start: editForm.start
+          ? new Date(editForm.start).toISOString()
+          : modalData.start,
+        end: editForm.end
+          ? new Date(editForm.end).toISOString()
+          : undefined,
         location: editForm.location || undefined,
         category: editForm.category,
         detail: editForm.detail || undefined,
@@ -202,9 +213,7 @@ export default function CalendarView({
 
       if (onEventsChange) {
         onEventsChange(
-          events.map((e) =>
-            e === modalData ? updated : e
-          )
+          events.map((e) => (e === modalData ? updated : e))
         );
       }
 
@@ -249,10 +258,10 @@ export default function CalendarView({
   }, [modalData, events, onEventsChange, closeModal]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-4">
-        <div className="hidden sm:block w-48 shrink-0">
-          <div className="rounded-xl bg-white p-4 shadow-sm sticky top-6">
+    <div className="flex gap-5">
+      <div className="hidden lg:block w-56 shrink-0">
+        <div className="sticky top-20 space-y-4">
+          <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200/60">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700">分类筛选</h3>
               <button
@@ -299,146 +308,207 @@ export default function CalendarView({
                 </label>
               ))}
             </div>
-            <div className="mt-3 border-t pt-3 text-xs text-gray-400">
+            <div className="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-400">
               显示 {filteredEvents.length}/{events.length} 个事件
             </div>
           </div>
+
+          <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-4 ring-1 ring-blue-200/60">
+            <p className="text-xs text-blue-600/80 leading-relaxed">
+              💡 点击日历中的事件可查看详情，支持编辑和删除操作
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0 space-y-4">
+        <div className="lg:hidden">
+          <button
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 transition-colors"
+            onClick={() => setShowFilter(!showFilter)}
+          >
+            <Filter className="h-4 w-4" />
+            分类筛选
+            {selectedCategories.size < CATEGORIES.length && (
+              <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">
+                {filteredEvents.length}/{events.length}
+              </span>
+            )}
+            <ChevronUp
+              className={`h-4 w-4 transition-transform ${showFilter ? "" : "rotate-180"}`}
+            />
+          </button>
+
+          {showFilter && (
+            <div className="mt-2 rounded-xl bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap gap-3">
+                {CATEGORIES.map((cat) => (
+                  <label
+                    key={cat}
+                    className="flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <button onClick={() => toggleCategory(cat)}>
+                      {selectedCategories.has(cat) ? (
+                        <CheckSquare
+                          className="h-4 w-4"
+                          style={{ color: CATEGORY_COLORS[cat] }}
+                        />
+                      ) : (
+                        <Square className="h-4 w-4 text-gray-300" />
+                      )}
+                    </button>
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ backgroundColor: CATEGORY_COLORS[cat] }}
+                    />
+                    <span className="text-sm text-gray-700">{cat}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 min-w-0 space-y-4">
-          <div className="sm:hidden">
-            <button
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 transition-colors"
-              onClick={() => setShowFilter(!showFilter)}
-            >
-              <Filter className="h-4 w-4" />
-              分类筛选
-              {selectedCategories.size < CATEGORIES.length && (
-                <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">
-                  {filteredEvents.length}/{events.length}
-                </span>
-              )}
-              <ChevronUp
-                className={`h-4 w-4 transition-transform ${showFilter ? "" : "rotate-180"}`}
-              />
-            </button>
+        <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200/60 sm:p-4 lg:p-5 overflow-hidden">
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin]}
+            initialView="dayGridMonth"
+            headerToolbar={{
+              left: "prev,next today",
+              center: "title",
+              right: "dayGridMonth,timeGridWeek,timeGridDay",
+            }}
+            buttonText={{
+              today: "今天",
+              month: "月",
+              week: "周",
+              day: "日",
+            }}
+            events={calendarEvents}
+            height="auto"
+            locale="zh-cn"
+            eventClick={(info) => {
+              info.jsEvent.preventDefault();
+              const props = info.event.extendedProps;
+              const original = filteredEvents.find(
+                (e) =>
+                  e.title === info.event.title &&
+                  e.start === info.event.startStr
+              );
+              if (original) {
+                openModal(original);
+              } else {
+                openModal({
+                  id: props.id,
+                  title: info.event.title,
+                  start: info.event.startStr,
+                  end: info.event.endStr || undefined,
+                  location: props.location,
+                  category: props.category,
+                  detail: props.detail,
+                  raw_message_preview: props.raw_message_preview,
+                });
+              }
+            }}
+            dayMaxEvents={4}
+            eventDisplay="block"
+          />
+        </div>
 
-            {showFilter && (
-              <div className="mt-2 rounded-xl bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap gap-3">
-                  {CATEGORIES.map((cat) => (
-                    <label
-                      key={cat}
-                      className="flex items-center gap-1.5 cursor-pointer"
+        <div className="hidden lg:block">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-700">
+              事件列表
+              <span className="ml-1.5 text-gray-400 font-normal">
+                ({filteredEvents.length})
+              </span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {filteredEvents.map((ev, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-gray-100 bg-white p-3.5 cursor-pointer hover:border-gray-200 hover:shadow-md transition-all group"
+                onClick={() => openModal(ev)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+                    {ev.title}
+                  </span>
+                  {ev.category && (
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${getCategoryBgClass(ev.category)}`}
                     >
-                      <button onClick={() => toggleCategory(cat)}>
-                        {selectedCategories.has(cat) ? (
-                          <CheckSquare
-                            className="h-4 w-4"
-                            style={{ color: CATEGORY_COLORS[cat] }}
-                          />
-                        ) : (
-                          <Square className="h-4 w-4 text-gray-300" />
-                        )}
-                      </button>
-                      <span
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{ backgroundColor: CATEGORY_COLORS[cat] }}
-                      />
-                      <span className="text-sm text-gray-700">{cat}</span>
-                    </label>
-                  ))}
+                      {ev.category}
+                    </span>
+                  )}
                 </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDateTime(ev.start)}
+                  </span>
+                  {ev.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {ev.location}
+                    </span>
+                  )}
+                </div>
+                {ev.detail && (
+                  <p className="mt-1.5 line-clamp-2 text-xs text-gray-500">
+                    {ev.detail}
+                  </p>
+                )}
+              </div>
+            ))}
+            {filteredEvents.length === 0 && (
+              <div className="col-span-2 rounded-xl bg-gray-50 p-8 text-center text-sm text-gray-400">
+                当前筛选条件下没有事件
               </div>
             )}
           </div>
+        </div>
 
-          <div className="rounded-xl bg-white p-3 sm:p-4 shadow-sm overflow-hidden">
-            <FullCalendar
-              plugins={[dayGridPlugin, timeGridPlugin]}
-              initialView="dayGridMonth"
-              headerToolbar={{
-                left: "prev,next today",
-                center: "title",
-                right: "dayGridMonth,timeGridWeek,timeGridDay",
-              }}
-              buttonText={{
-                today: "今天",
-                month: "月",
-                week: "周",
-                day: "日",
-              }}
-              events={calendarEvents}
-              height="auto"
-              locale="zh-cn"
-              eventClick={(info) => {
-                info.jsEvent.preventDefault();
-                const props = info.event.extendedProps;
-                const original = filteredEvents.find(
-                  (e) =>
-                    e.title === info.event.title &&
-                    e.start === info.event.startStr
-                );
-                if (original) {
-                  openModal(original);
-                } else {
-                  openModal({
-                    id: props.id,
-                    title: info.event.title,
-                    start: info.event.startStr,
-                    end: info.event.endStr || undefined,
-                    location: props.location,
-                    category: props.category,
-                    detail: props.detail,
-                    raw_message_preview: props.raw_message_preview,
-                  });
-                }
-              }}
-              dayMaxEvents={3}
-              eventDisplay="block"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-sm font-medium text-gray-500 px-1">
-              事件列表 ({filteredEvents.length})
-            </h2>
-            <div className="max-h-[40vh] space-y-2 overflow-y-auto">
-              {filteredEvents.map((ev, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg border border-gray-100 bg-white p-3 cursor-pointer hover:border-gray-200 hover:shadow-sm transition-shadow"
-                  onClick={() => openModal(ev)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-medium text-gray-900">
-                      {ev.title}
+        <div className="lg:hidden space-y-2">
+          <h2 className="text-sm font-medium text-gray-500 px-1">
+            事件列表 ({filteredEvents.length})
+          </h2>
+          <div className="max-h-[40vh] space-y-2 overflow-y-auto">
+            {filteredEvents.map((ev, i) => (
+              <div
+                key={i}
+                className="rounded-lg border border-gray-100 bg-white p-3 cursor-pointer hover:border-gray-200 hover:shadow-sm transition-shadow"
+                onClick={() => openModal(ev)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-medium text-gray-900">
+                    {ev.title}
+                  </span>
+                  {ev.category && (
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${getCategoryBgClass(ev.category)}`}
+                    >
+                      {ev.category}
                     </span>
-                    {ev.category && (
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${getCategoryBgClass(ev.category)}`}
-                      >
-                        {ev.category}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
-                    <span>{formatDateTime(ev.start)}</span>
-                    {ev.location && <span>📍 {ev.location}</span>}
-                  </div>
-                  {ev.detail && (
-                    <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                      {ev.detail}
-                    </p>
                   )}
                 </div>
-              ))}
-              {filteredEvents.length === 0 && (
-                <div className="rounded-lg bg-gray-50 p-6 text-center text-sm text-gray-400">
-                  当前筛选条件下没有事件
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+                  <span>{formatDateTime(ev.start)}</span>
+                  {ev.location && <span>📍 {ev.location}</span>}
                 </div>
-              )}
-            </div>
+                {ev.detail && (
+                  <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                    {ev.detail}
+                  </p>
+                )}
+              </div>
+            ))}
+            {filteredEvents.length === 0 && (
+              <div className="rounded-lg bg-gray-50 p-6 text-center text-sm text-gray-400">
+                当前筛选条件下没有事件
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -449,7 +519,7 @@ export default function CalendarView({
           onClick={closeModal}
         >
           <div
-            className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white p-5 shadow-xl max-h-[90vh] overflow-y-auto"
+            className="w-full sm:max-w-md lg:max-w-lg rounded-t-2xl sm:rounded-2xl bg-white p-5 shadow-xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between">
@@ -607,9 +677,9 @@ export default function CalendarView({
                     )}
                   </div>
 
-                  <div className="space-y-2 text-sm">
-                    <div className="flex gap-2">
-                      <span className="w-12 shrink-0 text-gray-400">时间</span>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex gap-3 items-start">
+                      <Clock className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                       <span className="text-gray-800">
                         {formatDateTime(modalData.start)}
                         {modalData.end &&
@@ -617,33 +687,27 @@ export default function CalendarView({
                       </span>
                     </div>
                     {modalData.location && (
-                      <div className="flex gap-2">
-                        <span className="w-12 shrink-0 text-gray-400">
-                          地点
-                        </span>
+                      <div className="flex gap-3 items-start">
+                        <MapPin className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                         <span className="text-gray-800">
                           {modalData.location}
                         </span>
                       </div>
                     )}
                     {modalData.detail && (
-                      <div className="flex gap-2">
-                        <span className="w-12 shrink-0 text-gray-400">
-                          详情
-                        </span>
+                      <div className="flex gap-3 items-start">
+                        <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                         <span className="text-gray-800">
                           {modalData.detail}
                         </span>
                       </div>
                     )}
                     {modalData.raw_message_preview && (
-                      <div className="flex gap-2">
-                        <span className="w-12 shrink-0 text-gray-400">
-                          原文
-                        </span>
-                        <span className="text-gray-500 text-xs italic">
+                      <div className="rounded-lg bg-gray-50 p-3 mt-2">
+                        <p className="text-xs text-gray-400 mb-1">原文预览</p>
+                        <p className="text-xs text-gray-500 italic">
                           {modalData.raw_message_preview}
-                        </span>
+                        </p>
                       </div>
                     )}
                   </div>
