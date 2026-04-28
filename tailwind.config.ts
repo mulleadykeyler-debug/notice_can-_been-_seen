@@ -6,6 +6,13 @@ const config: Config = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  safelist: [
+    "animate-slide-up",
+    "animate-float",
+    "animate-shimmer",
+    "animate-pulse-ring",
+    "animate-gradient",
+  ],
   theme: {
     extend: {
       colors: {
