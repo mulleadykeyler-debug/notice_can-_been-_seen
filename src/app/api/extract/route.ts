@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
         try {
           const events = await extractEventsFromText(
             body.text,
+            Array.isArray(body.categories) ? body.categories : ["学术", "行政", "社团活动", "生活", "其他"],
             (current, total) => {
               send({ type: "progress", current, total });
             }

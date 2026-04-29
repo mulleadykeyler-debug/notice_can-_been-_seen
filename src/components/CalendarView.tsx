@@ -28,33 +28,17 @@ export interface CalendarEventInput {
   raw_message_preview?: string;
 }
 
-const CATEGORIES = ["学术", "行政", "社团活动", "生活", "其他"] as const;
-
-const CATEGORY_COLORS: Record<string, string> = {
-  学术: "#3b82f6",
-  行政: "#ef4444",
-  社团活动: "#22c55e",
-  生活: "#eab308",
-  其他: "#6b7280",
-};
-
-function getCategoryColor(category?: string): string {
-  return CATEGORY_COLORS[category || "其他"] || CATEGORY_COLORS["其他"];
+export interface CalendarCategory {
+  name: string;
+  color: string;
 }
 
-function getCategoryBgClass(category?: string): string {
-  switch (category) {
-    case "学术":
-      return "bg-blue-100 text-blue-700";
-    case "行政":
-      return "bg-red-100 text-red-700";
-    case "社团活动":
-      return "bg-green-100 text-green-700";
-    case "生活":
-      return "bg-yellow-100 text-yellow-700";
-    default:
-      return "bg-gray-100 text-gray-700";
-  }
+function getCategoryBgStyle(color: string): string {
+  return `${color}20`;
+}
+
+function getCategoryTextStyle(color: string): string {
+  return color;
 }
 
 function formatDateTime(iso: string): string {
@@ -97,12 +81,16 @@ interface EditFormData {
 export default function CalendarView({
   events,
   onEventsChange,
+  categories,
+  onManageCategories,
 }: {
   events: CalendarEventInput[];
   onEventsChange?: (events: CalendarEventInput[]) => void;
+  categories: CalendarCategory[];
+  onManageCategories?: () => void;
 }) {
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
-    () => new Set(CATEGORIES)
+    () => new Set(categories.map((c) => c.name))
   );
   const [showFilter, setShowFilter] = useState(false);
   const [modalData, setModalData] = useState<CalendarEventInput | null>(null);
@@ -116,6 +104,10 @@ export default function CalendarView({
     detail: "",
   });
   const [isSaving, setIsSaving] = useState(false);
+
+  const colorMap = new Map(categories.map((c) => [c.name, c.color]));
+  const defaultColor = "#6b7280";
+  const getColor = (name?: string) => colorMap.get(name || "") || defaultColor;
 
   const toggleCategory = useCallback((cat: string) => {
     setSelectedCategories((prev) => {
@@ -137,8 +129,8 @@ export default function CalendarView({
     title: e.title,
     start: e.start,
     end: e.end || undefined,
-    backgroundColor: getCategoryColor(e.category),
-    borderColor: getCategoryColor(e.category),
+    backgroundColor: getColor(e.category),
+    borderColor: getColor(e.category),
     extendedProps: {
       id: e.id,
       location: e.location,
@@ -268,31 +260,31 @@ export default function CalendarView({
                 className="text-xs text-blue-600 hover:text-blue-800"
                 onClick={() =>
                   setSelectedCategories(
-                    selectedCategories.size === CATEGORIES.length
+                    selectedCategories.size === categories.length
                       ? new Set()
-                      : new Set(CATEGORIES)
+                      : new Set(categories.map((c) => c.name))
                   )
                 }
               >
-                {selectedCategories.size === CATEGORIES.length
+                {selectedCategories.size === categories.length
                   ? "全不选"
                   : "全选"}
               </button>
             </div>
             <div className="space-y-2">
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <label
-                  key={cat}
+                  key={cat.name}
                   className="flex items-center gap-2 cursor-pointer group"
                 >
                   <button
                     className="flex-shrink-0"
-                    onClick={() => toggleCategory(cat)}
+                    onClick={() => toggleCategory(cat.name)}
                   >
-                    {selectedCategories.has(cat) ? (
+                    {selectedCategories.has(cat.name) ? (
                       <CheckSquare
                         className="h-4 w-4"
-                        style={{ color: CATEGORY_COLORS[cat] }}
+                        style={{ color: cat.color }}
                       />
                     ) : (
                       <Square className="h-4 w-4 text-gray-300" />
@@ -300,10 +292,10 @@ export default function CalendarView({
                   </button>
                   <span
                     className="inline-block h-2 w-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: CATEGORY_COLORS[cat] }}
+                    style={{ backgroundColor: cat.color }}
                   />
                   <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                    {cat}
+                    {cat.name}
                   </span>
                 </label>
               ))}
@@ -311,6 +303,14 @@ export default function CalendarView({
             <div className="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-400">
               显示 {filteredEvents.length}/{events.length} 个事件
             </div>
+            {onManageCategories && (
+              <button
+                className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 py-1"
+                onClick={onManageCategories}
+              >
+                + 管理分类
+              </button>
+            )}
           </div>
 
           <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-4 ring-1 ring-blue-200/60">
@@ -329,7 +329,7 @@ export default function CalendarView({
           >
             <Filter className="h-4 w-4" />
             分类筛选
-            {selectedCategories.size < CATEGORIES.length && (
+            {selectedCategories.size < categories.length && (
               <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">
                 {filteredEvents.length}/{events.length}
               </span>
@@ -342,16 +342,16 @@ export default function CalendarView({
           {showFilter && (
             <div className="mt-2 rounded-xl bg-white p-4 shadow-sm">
               <div className="flex flex-wrap gap-3">
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <label
-                    key={cat}
+                    key={cat.name}
                     className="flex items-center gap-1.5 cursor-pointer"
                   >
-                    <button onClick={() => toggleCategory(cat)}>
-                      {selectedCategories.has(cat) ? (
+                    <button onClick={() => toggleCategory(cat.name)}>
+                      {selectedCategories.has(cat.name) ? (
                         <CheckSquare
                           className="h-4 w-4"
-                          style={{ color: CATEGORY_COLORS[cat] }}
+                          style={{ color: cat.color }}
                         />
                       ) : (
                         <Square className="h-4 w-4 text-gray-300" />
@@ -359,9 +359,9 @@ export default function CalendarView({
                     </button>
                     <span
                       className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: CATEGORY_COLORS[cat] }}
+                      style={{ backgroundColor: cat.color }}
                     />
-                    <span className="text-sm text-gray-700">{cat}</span>
+                    <span className="text-sm text-gray-700">{cat.name}</span>
                   </label>
                 ))}
               </div>
@@ -437,7 +437,8 @@ export default function CalendarView({
                   </span>
                   {ev.category && (
                     <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${getCategoryBgClass(ev.category)}`}
+                      className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{ backgroundColor: getCategoryBgStyle(getColor(ev.category)), color: getCategoryTextStyle(getColor(ev.category)) }}
                     >
                       {ev.category}
                     </span>
@@ -487,7 +488,8 @@ export default function CalendarView({
                   </span>
                   {ev.category && (
                     <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${getCategoryBgClass(ev.category)}`}
+                      className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{ backgroundColor: getCategoryBgStyle(getColor(ev.category)), color: getCategoryTextStyle(getColor(ev.category)) }}
                     >
                       {ev.category}
                     </span>
@@ -579,9 +581,9 @@ export default function CalendarView({
                         setEditForm((f) => ({ ...f, category: e.target.value }))
                       }
                     >
-                      {CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
+                      {categories.map((cat) => (
+                        <option key={cat.name} value={cat.name}>
+                          {cat.name}
                         </option>
                       ))}
                     </select>
@@ -670,7 +672,8 @@ export default function CalendarView({
                   <div className="flex items-center gap-2">
                     {modalData.category && (
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${getCategoryBgClass(modalData.category)}`}
+                        className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                        style={{ backgroundColor: getCategoryBgStyle(getColor(modalData.category)), color: getCategoryTextStyle(getColor(modalData.category)) }}
                       >
                         {modalData.category}
                       </span>

@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import CalendarView from "@/components/CalendarView";
 import type { CalendarEventInput } from "@/components/CalendarView";
+import CategoryManager from "@/components/CategoryManager";
+import { useCategories } from "@/hooks/useCategories";
 
 type ViewMode = "upload" | "calendar";
 
@@ -43,6 +45,9 @@ export default function Home() {
   );
   const [extractError, setExtractError] = useState("");
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const { categories, categoryNames, addCategory, removeCategory, updateCategory } =
+    useCategories();
 
   const filteredText = rawText ? preFilterText(rawText) : "";
   const filteredCount = rawText
@@ -67,7 +72,7 @@ export default function Home() {
       const extractRes = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: textToSend }),
+        body: JSON.stringify({ text: textToSend, categories: categoryNames }),
       });
 
       const contentType = extractRes.headers.get("content-type") || "";
@@ -190,7 +195,7 @@ export default function Home() {
       setIsLoading(false);
       setProgress({ current: 0, total: 0 });
     }
-  }, [rawText]);
+  }, [rawText, categoryNames]);
 
   const handleClear = useCallback(() => {
     setRawText("");
@@ -258,6 +263,8 @@ export default function Home() {
             <CalendarView
               events={calendarEvents}
               onEventsChange={setCalendarEvents}
+              categories={categories}
+              onManageCategories={() => setShowCategoryManager(true)}
             />
           ) : (
             <div className="animate-slide-up flex min-h-[60vh] items-center justify-center">
@@ -510,6 +517,16 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {showCategoryManager && (
+        <CategoryManager
+          categories={categories}
+          onAdd={addCategory}
+          onRemove={removeCategory}
+          onUpdateColor={(name, color) => updateCategory(name, { color })}
+          onClose={() => setShowCategoryManager(false)}
+        />
+      )}
     </div>
   );
 }

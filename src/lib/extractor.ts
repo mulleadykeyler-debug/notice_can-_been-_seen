@@ -12,7 +12,9 @@ export interface ExtractedEvent {
 
 export type ProgressCallback = (current: number, total: number) => void;
 
-const SYSTEM_PROMPT = `你是一个专门从大学生相关文本中提取通知事件的助手。
+function buildSystemPrompt(categories: string[]): string {
+  const catList = categories.join("、");
+  return `你是一个专门从大学生相关文本中提取通知事件的助手。
 我会给你一段文本（可能是群聊消息、公众号推文、课程通知、活动公告等）。
 请分析文本内容，并以 JSON 对象返回所有识别为通知的事件。
 返回格式为 {"events": [...]}
@@ -27,7 +29,7 @@ end_time: 结束时间，若通知没有结束时间则留空
 
 location: 地点，没有则留空
 
-category: 类别，仅限以下：学术、行政、社团活动、生活、其他
+category: 类别，仅限以下：${catList}
 
 detail: 补充细节或原始通知摘要
 
@@ -51,6 +53,7 @@ is_notification: true/false，表示是否为有效通知
 文本：哈哈哈昨天那节课笑死了
 输出：
 {"events":[]}`;
+}
 
 const cache = new Map<string, ExtractedEvent[]>();
 
@@ -60,6 +63,7 @@ function hashText(text: string): string {
 
 async function callDeepSeekAPI(
   userContent: string,
+  categories: string[],
   retries: number = 2
 ): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -70,7 +74,7 @@ async function callDeepSeekAPI(
   const body = {
     model: "deepseek-chat",
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: buildSystemPrompt(categories) },
       { role: "user", content: userContent },
     ],
     temperature: 0.1,
@@ -140,6 +144,7 @@ function parseEvents(rawContent: string): ExtractedEvent[] {
 
 export async function extractEventsFromText(
   text: string,
+  categories: string[] = ["学术", "行政", "社团活动", "生活", "其他"],
   onProgress?: ProgressCallback
 ): Promise<ExtractedEvent[]> {
   if (!text.trim()) {
@@ -171,7 +176,7 @@ export async function extractEventsFromText(
       continue;
     }
 
-    const rawContent = await callDeepSeekAPI(chunk);
+    const rawContent = await callDeepSeekAPI(chunk, categories);
     const events = parseEvents(rawContent);
 
     cache.set(cacheKey, events);
