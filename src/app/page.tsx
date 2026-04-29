@@ -12,13 +12,17 @@ import {
   Brain,
   Target,
   Layers,
+  ImagePlus,
+  FileText,
 } from "lucide-react";
 import CalendarView from "@/components/CalendarView";
 import type { CalendarEventInput } from "@/components/CalendarView";
 import CategoryManager from "@/components/CategoryManager";
+import ImageUpload from "@/components/ImageUpload";
 import { useCategories } from "@/hooks/useCategories";
 
 type ViewMode = "upload" | "calendar";
+type InputMode = "text" | "image";
 
 const EMOJI_REGEX =
   /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]+$/u;
@@ -40,6 +44,7 @@ export default function Home() {
   const [rawText, setRawText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("upload");
+  const [inputMode, setInputMode] = useState<InputMode>("text");
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventInput[]>(
     []
   );
@@ -202,6 +207,28 @@ export default function Home() {
     setExtractError("");
   }, []);
 
+  const handleImageExtracted = useCallback(
+    (events: CalendarEventInput[]) => {
+      try {
+        fetch("/api/saveEvents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ events }),
+        });
+      } catch {}
+
+      setCalendarEvents((prev) => {
+        const existing = new Set(prev.map((e) => `${e.title}::${e.start}`));
+        const newEvents = events.filter(
+          (e) => !existing.has(`${e.title}::${e.start}`)
+        );
+        return [...prev, ...newEvents];
+      });
+      setViewMode("calendar");
+    },
+    []
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <header className="sticky top-0 z-40 border-b border-gray-200/50 bg-white/70 backdrop-blur-xl">
@@ -295,111 +322,154 @@ export default function Home() {
               <div className="rounded-2xl bg-white/80 p-5 shadow-lg shadow-gray-200/50 ring-1 ring-gray-200/60 backdrop-blur-sm lg:p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500">
-                      <ClipboardList className="h-3.5 w-3.5 text-white" />
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${inputMode === "text" ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-400 to-blue-500"}`}>
+                      {inputMode === "text" ? (
+                        <FileText className="h-3.5 w-3.5 text-white" />
+                      ) : (
+                        <ImagePlus className="h-3.5 w-3.5 text-white" />
+                      )}
                     </div>
                     <h2 className="text-sm font-semibold text-gray-700">
-                      粘贴通知文本
+                      {inputMode === "text" ? "粘贴通知文本" : "上传通知图片"}
                     </h2>
                   </div>
-                  {rawText && (
-                    <button
-                      className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                      onClick={handleClear}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      清除
-                    </button>
-                  )}
-                </div>
-                <div className="relative">
-                  <textarea
-                    className="w-full rounded-xl border border-gray-200 bg-gradient-to-b from-gray-50/80 to-white p-4 text-sm text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 resize-none transition-all lg:text-sm"
-                    rows={14}
-                    placeholder={
-                      "粘贴群聊通知、公众号推文、课程通知等文本内容...\n\nAI 会自动识别其中的时间、地点、类别等事件信息。"
-                    }
-                    value={rawText}
-                    onChange={(e) => {
-                      setRawText(e.target.value);
-                      setExtractError("");
-                    }}
-                  />
-                  {isLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/60 backdrop-blur-sm">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="relative">
-                          <div className="h-12 w-12 rounded-full border-4 border-blue-100" />
-                          <div className="absolute inset-0 h-12 w-12 rounded-full border-4 border-transparent border-t-blue-500 animate-spin" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-medium text-gray-700">
-                            {progress.total > 0
-                              ? `正在分析第 ${progress.current}/${progress.total} 批…`
-                              : "AI 分析中…"}
-                          </p>
-                          <p className="mt-0.5 text-xs text-gray-400">
-                            请稍候，正在提取通知事件
-                          </p>
-                        </div>
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex rounded-lg bg-gray-100 p-0.5 ring-1 ring-gray-200/60">
+                      <button
+                        className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                          inputMode === "text"
+                            ? "bg-white text-gray-900 shadow-sm ring-1 ring-gray-200/60"
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                        onClick={() => setInputMode("text")}
+                      >
+                        <FileText className="h-3 w-3" />
+                        文本
+                      </button>
+                      <button
+                        className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                          inputMode === "image"
+                            ? "bg-white text-gray-900 shadow-sm ring-1 ring-gray-200/60"
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                        onClick={() => setInputMode("image")}
+                      >
+                        <ImagePlus className="h-3 w-3" />
+                        图片
+                      </button>
                     </div>
-                  )}
-                </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {rawText && (
-                      <>
-                        <span className="text-xs text-gray-400">
-                          {rawText.length} 字
-                        </span>
-                        {filteredCount > 0 && (
-                          <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-600 ring-1 ring-amber-200/60">
-                            <Filter className="h-3 w-3" />
-                            已过滤 {filteredCount} 条无效行
-                          </span>
-                        )}
-                      </>
+                    {inputMode === "text" && rawText && (
+                      <button
+                        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                        onClick={handleClear}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        清除
+                      </button>
                     )}
                   </div>
-                  {filteredText && (
-                    <span className="flex items-center gap-1 text-xs text-emerald-600">
-                      <Zap className="h-3 w-3" />
-                      {filteredText.split("\n").filter((l) => l.trim()).length}{" "}
-                      行待分析
-                    </span>
-                  )}
                 </div>
+
+                {inputMode === "text" ? (
+                  <div className="relative">
+                    <textarea
+                      className="w-full rounded-xl border border-gray-200 bg-gradient-to-b from-gray-50/80 to-white p-4 text-sm text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 resize-none transition-all lg:text-sm"
+                      rows={14}
+                      placeholder={
+                        "粘贴群聊通知、公众号推文、课程通知等文本内容...\n\nAI 会自动识别其中的时间、地点、类别等事件信息。"
+                      }
+                      value={rawText}
+                      onChange={(e) => {
+                        setRawText(e.target.value);
+                        setExtractError("");
+                      }}
+                    />
+                    {isLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/60 backdrop-blur-sm">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="relative">
+                            <div className="h-12 w-12 rounded-full border-4 border-blue-100" />
+                            <div className="absolute inset-0 h-12 w-12 rounded-full border-4 border-transparent border-t-blue-500 animate-spin" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-gray-700">
+                              {progress.total > 0
+                                ? `正在分析第 ${progress.current}/${progress.total} 批…`
+                                : "AI 分析中…"}
+                            </p>
+                            <p className="mt-0.5 text-xs text-gray-400">
+                              请稍候，正在提取通知事件
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <ImageUpload
+                    categories={categoryNames}
+                    onEventsExtracted={handleImageExtracted}
+                  />
+                )}
+
+                {inputMode === "text" && (
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {rawText && (
+                        <>
+                          <span className="text-xs text-gray-400">
+                            {rawText.length} 字
+                          </span>
+                          {filteredCount > 0 && (
+                            <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-600 ring-1 ring-amber-200/60">
+                              <Filter className="h-3 w-3" />
+                              已过滤 {filteredCount} 条无效行
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {filteredText && (
+                      <span className="flex items-center gap-1 text-xs text-emerald-600">
+                        <Zap className="h-3 w-3" />
+                        {filteredText.split("\n").filter((l) => l.trim()).length}{" "}
+                        行待分析
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {extractError && (
+              {extractError && inputMode === "text" && (
                 <div className="animate-slide-up rounded-xl bg-gradient-to-r from-red-50 to-rose-50 px-4 py-3 text-sm text-red-600 ring-1 ring-red-200/60">
                   <span className="font-medium">⚠</span> {extractError}
                 </div>
               )}
 
-              <button
-                className="group relative flex w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-blue-500/25 overflow-hidden"
-                onClick={handleExtract}
-                disabled={!rawText.trim() || isLoading}
-              >
-                {!isLoading && (
-                  <div className="absolute inset-0 animate-shimmer" />
-                )}
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {progress.total > 0
-                      ? `正在分析第 ${progress.current}/${progress.total} 批…`
-                      : "AI 分析中…"}
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    分析通知
-                  </>
-                )}
-              </button>
+              {inputMode === "text" && (
+                <button
+                  className="group relative flex w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-blue-500/25 overflow-hidden"
+                  onClick={handleExtract}
+                  disabled={!rawText.trim() || isLoading}
+                >
+                  {!isLoading && (
+                    <div className="absolute inset-0 animate-shimmer" />
+                  )}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {progress.total > 0
+                        ? `正在分析第 ${progress.current}/${progress.total} 批…`
+                        : "AI 分析中…"}
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      分析通知
+                    </>
+                  )}
+                </button>
+              )}
 
               {calendarEvents.length > 0 && viewMode === "upload" && (
                 <div className="animate-slide-up rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 p-4 ring-1 ring-emerald-200/60">
@@ -437,7 +507,7 @@ export default function Home() {
                   <div className="space-y-4">
                     <div className="flex gap-3">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-                        <ClipboardList className="h-4 w-4 text-blue-500" />
+                        <FileText className="h-4 w-4 text-blue-500" />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-700">
@@ -450,7 +520,20 @@ export default function Home() {
                     </div>
                     <div className="flex gap-3">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
-                        <Brain className="h-4 w-4 text-indigo-500" />
+                        <ImagePlus className="h-4 w-4 text-indigo-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">
+                          上传图片
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          课程表、活动海报、通知截图，AI 自动识别
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-50">
+                        <Brain className="h-4 w-4 text-purple-500" />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-700">
@@ -479,15 +562,17 @@ export default function Home() {
 
                 <div className="rounded-2xl bg-white/80 p-5 shadow-lg shadow-gray-200/50 ring-1 ring-gray-200/60 backdrop-blur-sm">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                    支持的文本类型
+                    支持的输入类型
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {[
                       "群聊通知",
                       "课程安排",
                       "会议纪要",
-                      "活动公告",
+                      "活动海报",
                       "考试通知",
+                      "通知截图",
+                      "课程表图片",
                       "作业提醒",
                     ].map((tag) => (
                       <span

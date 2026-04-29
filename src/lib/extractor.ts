@@ -191,3 +191,107 @@ export async function extractEventsFromText(
     return true;
   });
 }
+
+function buildImageSystemPrompt(categories: string[]): string {
+  const catList = categories.join("、");
+  return `你是一个专门从图片中提取通知事件的助手。
+我会给你一张图片（可能是课程表、活动海报、通知截图、会议纪要等）。
+请仔细识别图片中的所有文字和关键信息，并以 JSON 对象返回所有识别为通知的事件。
+返回格式为 {"events": [...]}
+
+每个事件包含以下字段：
+
+title: 简短通知标题
+
+start_time: ISO 8601 格式的开始时间，结合图片中的时间信息推算（默认时区为 Asia/Shanghai）。如果图片中有明确日期则直接使用，如果没有则根据上下文推断，若实在无法确定则留空。
+
+end_time: 结束时间，若通知没有结束时间则留空
+
+location: 地点，没有则留空
+
+category: 类别，仅限以下：${catList}
+
+detail: 补充细节或原始通知摘要
+
+is_notification: true/false，表示是否为有效通知
+
+注意：
+
+仅返回 is_notification 为 true 的条目。
+
+如果图片中不包含通知信息（纯风景照、个人照片等），直接返回空数组。
+
+一张图片中包含多个通知的话，拆分为多个事件。
+
+无论如何只返回 JSON，不要带其他文字。`;
+}
+
+export async function extractEventsFromImage(
+  base64Image: string,
+  mimeType: string,
+  categories: string[] = ["学术", "行政", "社团活动", "生活", "其他"]
+): Promise<ExtractedEvent[]> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY 环境变量未配置");
+  }
+
+  const body = {
+    model: "deepseek-chat",
+    messages: [
+      { role: "system", content: buildImageSystemPrompt(categories) },
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:${mimeType};base64,${base64Image}`,
+            },
+          },
+          {
+            type: "text",
+            text: "请识别这张图片中的所有通知事件信息。",
+          },
+        ],
+      },
+    ],
+    temperature: 0.1,
+    response_format: { type: "json_object" },
+  };
+
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    try {
+      const response = await fetch(
+        "https://api.deepseek.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `DeepSeek API 请求失败 (${response.status}): ${errorText}`
+        );
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) {
+        throw new Error("DeepSeek API 返回内容为空");
+      }
+
+      return parseEvents(content);
+    } catch (error) {
+      if (attempt === 2) throw error;
+    }
+  }
+
+  throw new Error("DeepSeek 图片识别调用失败，已重试 2 次");
+}
